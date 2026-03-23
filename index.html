@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jazz cafe Blue moon — Post Generator</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inconsolata:wght@300;400&display=swap');
+
+:root {
+  --ink: #141210;
+  --surface: #1c1916;
+  --gold: #b8945a;
+  --gold-light: #d4b07a;
+  --smoke: #7a7570;
+  --paper: #ede8de;
+  --border: rgba(184,148,90,0.22);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:var(--ink); color:var(--paper);
+  font-family:'Inconsolata',monospace;
+  min-height:100vh; padding:36px 20px 60px;
+  display:flex; flex-direction:column; align-items:center;
+}
+header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
+.cafe-name { font-family:'Cormorant Garamond',serif; font-size:clamp(22px,4vw,36px); font-weight:300; letter-spacing:0.14em; color:var(--gold); }
+.cafe-name em { font-style:italic; color:var(--gold-light); }
+.sub { font-size:10px; letter-spacing:0.35em; color:var(--smoke); text-transform:uppercase; margin-top:6px; }
+.rule { width:48px; height:1px; background:var(--border); margin:16px auto; }
+
+.wrap { width:100%; max-width:960px; display:grid; grid-template-columns:1fr 1fr; gap:20px; animation:fadeUp 0.8s ease 0.15s both; }
+@media(max-width:640px){ .wrap{ grid-template-columns:1fr; } }
+
+/* CANVAS */
+.canvas-wrap { position:relative; aspect-ratio:1/1; border-radius:2px; overflow:hidden; border:1px solid var(--border); background:#080604; }
+.c-photo { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 1.4s ease; }
+.c-photo.show { opacity:0.48; }
+.c-grad { position:absolute; inset:0; background:linear-gradient(150deg,rgba(6,4,2,0.72) 0%,rgba(6,4,2,0.08) 42%,rgba(6,4,2,0.88) 100%); }
+.c-record { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); opacity:0.13; pointer-events:none; animation:spin 22s linear infinite; }
+@media(prefers-reduced-motion:reduce){ .c-record{ animation:none; } }
+.c-content { position:absolute; inset:0; padding:24px; display:flex; flex-direction:column; justify-content:space-between; }
+.c-top { display:flex; justify-content:space-between; align-items:flex-start; }
+.c-label { font-size:8.5px; letter-spacing:0.28em; text-transform:uppercase; color:var(--gold); opacity:0.7; }
+.c-datestr { font-family:'Cormorant Garamond',serif; font-size:11px; font-style:italic; letter-spacing:0.1em; color:rgba(237,232,222,0.4); }
+.c-caption { font-family:'Cormorant Garamond',serif; font-size:clamp(11px,1.6vw,14px); font-weight:300; line-height:1.82; color:var(--paper); white-space:pre-wrap; text-shadow:0 1px 14px rgba(0,0,0,0.95); min-height:3em; }
+.c-footer { font-size:8px; letter-spacing:0.24em; color:var(--gold); text-transform:uppercase; opacity:0.55; margin-top:12px; }
+
+/* Drop zone */
+.drop-zone {
+  border:1px dashed var(--border); border-radius:2px;
+  padding:10px; text-align:center; cursor:pointer;
+  transition:border-color 0.2s; font-size:10px;
+  letter-spacing:0.15em; color:var(--smoke); text-transform:uppercase;
+  background:var(--surface);
+}
+.drop-zone:hover, .drop-zone.drag { border-color:var(--gold); color:var(--gold); }
+.drop-zone input { display:none; }
+
+.photo-thumbs { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+.thumb {
+  width:44px; height:44px; object-fit:cover; border-radius:1px;
+  border:1px solid var(--border); cursor:pointer; opacity:0.7; transition:all 0.15s;
+}
+.thumb:hover { opacity:1; border-color:var(--gold); }
+.thumb.active { opacity:1; border-color:var(--gold); border-width:2px; }
+
+/* Source toggle */
+.src-row { display:flex; gap:6px; margin-bottom:2px; }
+.src-btn {
+  font-family:'Inconsolata',monospace; font-size:10px; letter-spacing:0.12em;
+  text-transform:uppercase; padding:5px 12px; border:1px solid var(--border);
+  background:transparent; color:var(--smoke); cursor:pointer; transition:all 0.15s; border-radius:1px;
+}
+.src-btn.on { background:rgba(184,148,90,0.11); border-color:var(--gold); color:var(--gold); }
+
+/* PANEL */
+.panel { display:flex; flex-direction:column; gap:12px; }
+.s-label { font-size:9px; letter-spacing:0.3em; text-transform:uppercase; color:var(--smoke); margin-bottom:6px; }
+.chips { display:flex; flex-wrap:wrap; gap:5px; }
+.chip {
+  font-family:'Inconsolata',monospace; font-size:10px; letter-spacing:0.09em;
+  padding:5px 10px; border:1px solid var(--border); background:transparent;
+  color:var(--smoke); cursor:pointer; transition:all 0.15s; border-radius:1px; text-transform:uppercase;
+}
+.chip:hover { border-color:var(--smoke); color:var(--paper); }
+.chip.on { background:rgba(184,148,90,0.11); border-color:var(--gold); color:var(--gold); }
+
+.ctx-row { display:flex; gap:7px; flex-wrap:wrap; }
+.ctx-sel {
+  font-family:'Inconsolata',monospace; font-size:11px;
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--paper); padding:7px 8px; border-radius:1px; cursor:pointer; flex:1; min-width:88px;
+}
+.ctx-sel option { background:var(--surface); }
+
+.out-box { background:var(--surface); border:1px solid var(--border); padding:15px; border-radius:1px; flex:1; min-height:120px; }
+.out-text { font-family:'Cormorant Garamond',serif; font-size:14.5px; font-weight:300; line-height:1.85; color:var(--paper); white-space:pre-wrap; }
+.out-tags { font-size:11px; color:var(--gold); line-height:1.9; opacity:0.62; margin-top:11px; word-break:break-word; }
+
+.btn-row { display:flex; gap:8px; }
+.btn-gen {
+  font-family:'Inconsolata',monospace; font-size:11px; letter-spacing:0.2em; text-transform:uppercase;
+  background:var(--gold); color:var(--ink); border:none; padding:13px 0; flex:1; cursor:pointer; transition:background 0.18s; border-radius:1px;
+}
+.btn-gen:hover { background:var(--gold-light); }
+.btn-copy {
+  font-family:'Inconsolata',monospace; font-size:11px; letter-spacing:0.18em; text-transform:uppercase;
+  background:transparent; color:var(--smoke); border:1px solid var(--border);
+  padding:13px 15px; cursor:pointer; transition:all 0.18s; border-radius:1px;
+}
+.btn-copy:hover { color:var(--paper); border-color:var(--smoke); }
+.status { font-size:10px; letter-spacing:0.2em; color:var(--smoke); text-align:center; min-height:15px; }
+.status.ok { color:var(--gold); }
+.status.err { color:#c06050; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(9px)} to{opacity:1;transform:translateY(0)} }
+@keyframes spin { to{transform:translate(-50%,-50%) rotate(360deg)} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="cafe-name">Jazz cafe <em>Blue moon</em></div>
+  <div class="sub">Instagram Post Generator</div>
+  <div class="rule"></div>
+</header>
+
+<div class="wrap">
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <img class="c-photo" id="bgPhoto" alt="">
+    <div class="c-grad"></div>
+    <svg class="c-record" width="210" height="210" viewBox="0 0 210 210">
+      <circle cx="105" cy="105" r="103" fill="#060402" stroke="#201e18" stroke-width="0.6"/>
+      <circle cx="105" cy="105" r="88"  fill="none" stroke="#181612" stroke-width="0.9"/>
+      <circle cx="105" cy="105" r="73"  fill="none" stroke="#1c1a14" stroke-width="0.9"/>
+      <circle cx="105" cy="105" r="58"  fill="none" stroke="#181612" stroke-width="0.9"/>
+      <circle cx="105" cy="105" r="43"  fill="none" stroke="#1c1a14" stroke-width="0.9"/>
+      <circle cx="105" cy="105" r="28"  fill="none" stroke="#181612" stroke-width="0.9"/>
+      <circle cx="105" cy="105" r="18"  fill="#100e0c" stroke="#282420" stroke-width="0.5"/>
+      <circle cx="105" cy="105" r="5.5" fill="#2c2820"/>
+      <circle cx="105" cy="105" r="2"   fill="#46423c"/>
+    </svg>
+    <div class="c-content">
+      <div class="c-top">
+        <div class="c-label">Jazz cafe Blue moon</div>
+        <div class="c-datestr" id="canvasDate"></div>
+      </div>
+      <div>
+        <div class="c-caption" id="canvasCaption">—</div>
+        <div class="c-footer">Jazz cafe Blue moon &middot; open 13:00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL -->
+  <div class="panel">
+
+    <!-- Mood -->
+    <div>
+      <div class="s-label">今日のムード</div>
+      <div class="chips" id="moodChips">
+        <button class="chip on"  data-mood="record">レコード</button>
+        <button class="chip" data-mood="siphon">サイフォン</button>
+        <button class="chip" data-mood="book">読書</button>
+        <button class="chip" data-mood="audio">ヴィンテージオーディオ</button>
+        <button class="chip" data-mood="quiet">静寂</button>
+        <button class="chip" data-mood="adult">大人の時間</button>
+        <button class="chip" data-mood="coffee">珈琲</button>
+        <button class="chip" data-mood="dining">ジャズ食事</button>
+        <button class="chip" data-mood="kissa">ジャズ喫茶</button>
+        <button class="chip" data-mood="evening">夕暮れ</button>
+        <button class="chip" data-mood="rain">雨の日</button>
+      </div>
+    </div>
+
+    <!-- Context -->
+    <div>
+      <div class="s-label">今日の文脈</div>
+      <div class="ctx-row">
+        <select class="ctx-sel" id="ctxWeather">
+          <option value="clear">天気：晴れ</option>
+          <option value="cloudy">天気：曇り</option>
+          <option value="rain">天気：雨</option>
+        </select>
+        <select class="ctx-sel" id="ctxDay">
+          <option value="weekday">平日</option>
+          <option value="weekend">週末・祝日</option>
+        </select>
+      </div>
+      <div class="ctx-row" style="margin-top:7px">
+        <select class="ctx-sel" id="ctxSeason">
+          <option value="spring">季節：春</option>
+          <option value="summer">季節：夏</option>
+          <option value="autumn">季節：秋</option>
+          <option value="winter">季節：冬</option>
+        </select>
+        <select class="ctx-sel" id="ctxGuest">
+          <option value="solo">おひとり様</option>
+          <option value="couple">カップル</option>
+          <option value="general">どなたでも</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Photo source -->
+    <div>
+      <div class="s-label">背景画像</div>
+      <div class="src-row">
+        <button class="src-btn on" id="srcUnsplash" onclick="setSource('unsplash')">Unsplash</button>
+        <button class="src-btn" id="srcOwn" onclick="setSource('own')">自分の写真</button>
+      </div>
+
+      <!-- Own photo upload -->
+      <div id="ownPhotoArea" style="display:none; margin-top:8px;">
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          ここに写真をドロップ または タップして選択
+          <input type="file" id="fileInput" accept="image/*" multiple>
+        </div>
+        <div class="photo-thumbs" id="photoThumbs"></div>
+      </div>
+    </div>
+
+    <!-- Output -->
+    <div class="out-box">
+      <div class="out-text" id="outText">—</div>
+      <div class="out-tags" id="outTags"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-gen" onclick="generate()">Generate</button>
+      <button class="btn-copy" onclick="copyAll()">Copy</button>
+    </div>
+    <div class="status" id="statusEl"></div>
+  </div>
+</div>
+
+<script>
+const UNSPLASH_KEY = 'BlfKi84Fck9LdUpUg2uG1eyg4uzuumopYcsl7hgbImE';
+
+/* ── Date ── */
+const now = new Date();
+const DAY = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+document.getElementById('canvasDate').textContent =
+  `${DAY[now.getDay()]}. ${MON[now.getMonth()]} ${now.getDate()}`;
+
+const m = now.getMonth();
+const sEl = document.getElementById('ctxSeason');
+sEl.value = (m<=1||m===11)?'winter':m<=4?'spring':m<=7?'summer':'autumn';
+document.getElementById('ctxDay').value = (now.getDay()===0||now.getDay()===6)?'weekend':'weekday';
+
+/* ── State ── */
+let activeMood  = 'record';
+let photoSource = 'unsplash';
+let ownPhotos   = [];
+let activeOwn   = null;
+let lastCapIdx  = -1;
+
+/* ── Mood chips ── */
+document.querySelectorAll('#moodChips .chip').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('#moodChips .chip').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+    activeMood = c.dataset.mood;
+  });
+});
+
+/* ── Photo source toggle ── */
+function setSource(src) {
+  photoSource = src;
+  document.getElementById('srcUnsplash').classList.toggle('on', src==='unsplash');
+  document.getElementById('srcOwn').classList.toggle('on', src==='own');
+  document.getElementById('ownPhotoArea').style.display = src==='own' ? 'block' : 'none';
+}
+
+/* ── Own photo upload ── */
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const thumbsEl  = document.getElementById('photoThumbs');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+function handleFiles(files) {
+  Array.from(files).forEach(f => {
+    if (!f.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      ownPhotos.push(e.target.result);
+      addThumb(e.target.result, ownPhotos.length - 1);
+      if (ownPhotos.length === 1) selectOwn(0);
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+function addThumb(src, idx) {
+  const img = document.createElement('img');
+  img.className = 'thumb';
+  img.src = src;
+  img.onclick = () => selectOwn(idx);
+  thumbsEl.appendChild(img);
+}
+
+function selectOwn(idx) {
+  activeOwn = idx;
+  document.querySelectorAll('.thumb').forEach((t,i) => t.classList.toggle('active', i===idx));
+  setCanvasPhoto(ownPhotos[idx]);
+}
+
+/* ── Unsplash queries per mood ── */
+const UNSPLASH_Q = {
+  record:  'vinyl record jazz turntable',
+  siphon:  'siphon coffee brewing cafe',
+  book:    'book cafe coffee reading',
+  audio:   'vintage speaker hifi audio',
+  quiet:   'dark cafe moody interior',
+  adult:   'elegant cafe lounge dark',
+  coffee:  'black coffee espresso dark',
+  dining:  'jazz restaurant dim candlelight',
+  kissa:   'vintage japanese cafe retro',
+  evening: 'cafe dusk afternoon golden light',
+  rain:    'rainy cafe window coffee',
+};
+
+async function loadUnsplashPhoto(mood) {
+  const q = UNSPLASH_Q[mood] || 'jazz cafe dark';
+  try {
+    const res = await fetch(
+      `https://api.unsplash.com/photos/random?query=${encodeURIComponent(q)}&orientation=squarish&client_id=${UNSPLASH_KEY}`
+    );
+    if (!res.ok) throw new Error('Unsplash fetch failed');
+    const data = await res.json();
+    setCanvasPhoto(data.urls.regular);
+  } catch(e) {
+    // fallback to picsum
+    const id = [1044,431,256,160,412,188,442,206,103,372,341][Object.keys(UNSPLASH_Q).indexOf(mood)] || 1044;
+    setCanvasPhoto(`https://picsum.photos/id/${id}/800/800`);
+    showStatus('Unsplash接続エラー：代替画像を使用', 'err');
+  }
+}
+
+function setCanvasPhoto(src) {
+  const el = document.getElementById('bgPhoto');
+  el.classList.remove('show');
+  const tmp = new Image();
+  tmp.onload  = () => { el.src = tmp.src; el.classList.add('show'); };
+  tmp.onerror = () => {};
+  tmp.src = src;
+}
+
+/* ── Captions ── */
+const CAPTIONS = {
+  record: [
+    { text: "針が盤面に触れる、その一瞬の前\nJazz cafe Blue moon は、静かにそこにある\nsomewhere between the groove and the silence", tags: "#jazzvinyl #レコード #ジャズ喫茶 #jazzcafe #vinyllovers #大阪カフェ #bluemoon #analogsound #珈琲時間 #quietafternoon" },
+    { text: "A面が終わる\n誰かがそっと盤をひっくり返す午後\nJazz cafe Blue moon、13時から", tags: "#vinyl #レコード #ジャズ #jazzkissa #大阪珈琲 #午後のカフェ #アナログ #jazzlovers #珈琲 #静かな時間" },
+    { text: "レコードは、音楽より少し多くのものを運ぶ\n埃の記憶、誰かの手の温もり\nJazz cafe Blue moon", tags: "#vinylrecord #ジャズ喫茶 #レコード #jazzcafe #osaka #珈琲 #大人のカフェ #analoglife #jazzbar #静寂" },
+    { text: "今日もどこかで\n針が落ちる\nJazz cafe Blue moon で、音楽が始まる", tags: "#jazzvinyl #レコード #ジャズ #vinyllovers #大阪 #cafelife #珈琲時間 #jazzkissa #午後 #ほの暗い空間" }
+  ],
+  siphon: [
+    { text: "ガラスの中で珈琲が昇る\nゆっくりと、確かに\nJazz cafe Blue moon のサイフォン、今日も午後から", tags: "#サイフォンコーヒー #siphoncoffee #珈琲 #ジャズ喫茶 #specialtycoffee #大阪カフェ #coffeetime #手仕事 #bluemoon #大人のカフェ" },
+    { text: "炎と水とガラス\nそれだけで珈琲は生まれる\nJazz cafe Blue moon", tags: "#siphon #サイフォン #珈琲 #jazzcafe #coffeelover #大阪 #手淹れ珈琲 #午後の珈琲 #ジャズ #静かな時間" },
+    { text: "Slow coffee, slow afternoon\nサイフォンの音だけが聞こえる\nJazz cafe Blue moon にて", tags: "#サイフォンコーヒー #siphoncoffee #specialtycoffee #大阪カフェ #珈琲時間 #ジャズ喫茶 #coffeecraft #午後 #大人 #bluemoon" },
+    { text: "時間をかけることを\n誰かに見せてもらった気がした\nJazz cafe Blue moon のサイフォンの前で", tags: "#サイフォン #siphon #珈琲 #coffeetime #大阪 #ジャズカフェ #手仕事の珈琲 #bluemoon #午後のカフェ #静寂" }
+  ],
+  book: [
+    { text: "本を開く、珈琲を置く\nジャズが低く流れている\nJazz cafe Blue moon、今日も静かに扉を開けている", tags: "#ブックカフェ #bookcafe #読書カフェ #jazzcafe #珈琲 #大阪カフェ #読書時間 #ジャズ #午後の読書 #大人のカフェ" },
+    { text: "紙の匂いと珈琲の匂いが\nどちらが先かわからなくなる午後\nJazz cafe Blue moon", tags: "#読書 #bookcafe #ブックカフェ #珈琲 #jazzcafe #大阪 #本と珈琲 #静かな午後 #ジャズ喫茶 #読書好き" },
+    { text: "A good book, a dark cup\nレコードが静かに回っている\nJazz cafe Blue moon にて、午後から", tags: "#bookcafe #読書カフェ #ブックカフェ #jazzvinyl #珈琲時間 #大阪カフェ #読書 #ジャズ #bluemoon #静寂" },
+    { text: "一冊の本があれば\n午後はもう十分だ\nJazz cafe Blue moon", tags: "#読書 #本と珈琲 #ブックカフェ #bookcafe #ジャズ喫茶 #大阪カフェ #珈琲 #静かな時間 #大人のカフェ #jazzcafe" }
+  ],
+  audio: [
+    { text: "JBLが低く唸る\nALTECが部屋を満たす\nJazz cafe Blue moon、本物の音がある午後", tags: "#JBL #ALTEC #ヴィンテージオーディオ #vintageaudio #ジャズ喫茶 #jazzkissa #大阪 #hifi #レコード #音楽のある空間" },
+    { text: "スピーカーは嘘をつかない\n音の粒が、空気になる\nJazz cafe Blue moon", tags: "#vintageaudio #ヴィンテージオーディオ #JBL #ALTEC #ジャズ喫茶 #vinyl #hifiaudio #大阪カフェ #レコード #本物の音" },
+    { text: "Vintage speakers, real sound\nデジタルにはない何かが\nこの部屋には漂っている\nJazz cafe Blue moon", tags: "#ヴィンテージオーディオ #JBL #ALTEC #vintageaudio #ジャズ喫茶 #hifi #レコード #jazzbar #大阪 #音楽" },
+    { text: "アンプのランプが灯る\nレコードが回り始める\nJazz cafe Blue moon、午後の音が始まった", tags: "#vintageaudio #ヴィンテージオーディオ #JBL #ALTEC #ジャズ #jazzvinyl #大阪カフェ #レコード #hifi #午後" }
+  ],
+  quiet: [
+    { text: "何も言わなくていい場所\nそこにいるだけでいい\nJazz cafe Blue moon、ほの暗い午後", tags: "#静寂 #大人のカフェ #ジャズ喫茶 #quietcafe #大阪カフェ #jazzcafe #珈琲 #ひとりの時間 #落ち着いた空間 #bluemoon" },
+    { text: "Silence has its own sound\n静かさにも音がある\nJazz cafe Blue moon", tags: "#静寂 #quietafternoon #ジャズ喫茶 #大阪 #珈琲時間 #大人の時間 #jazzcafe #ほの暗い #落ち着いた空間 #午後" },
+    { text: "ほの暗い、それだけで\n息ができる気がする\nJazz cafe Blue moon", tags: "#ジャズ喫茶 #静かなカフェ #大阪カフェ #大人のカフェ #quietcafe #珈琲 #jazzkissa #静寂 #落ち着き #bluemoon" },
+    { text: "何もしない午後を\n大切にしている場所が\nここにある\nJazz cafe Blue moon", tags: "#大人のカフェ #静寂 #ジャズ喫茶 #quiettime #珈琲 #大阪 #jazzbar #ひとり時間 #落ち着いた空間 #午後のカフェ" }
+  ],
+  adult: [
+    { text: "急がなくていい\n誰かに説明しなくていい\nJazz cafe Blue moon、大人だけが知る午後", tags: "#大人のカフェ #ジャズ喫茶 #大阪カフェ #jazzcafe #珈琲 #大人時間 #落ち着いた空間 #静寂 #bluemoon #午後" },
+    { text: "洗練とは\n引き算の果てにあるものだ\nJazz cafe Blue moon", tags: "#大人のカフェ #ジャズ喫茶 #大阪 #jazzbar #珈琲 #静かな時間 #大人時間 #落ち着き #レコード #jazzlovers" },
+    { text: "For those who know\n急がない人のための場所\nJazz cafe Blue moon、13時から", tags: "#大人のカフェ #adultstyle #ジャズ喫茶 #大阪カフェ #jazzcafe #珈琲 #落ち着いた空間 #静寂 #午後 #bluemoon" },
+    { text: "自分のためだけに使う時間\nそれをここでは\n「午後」と呼んでいる\nJazz cafe Blue moon", tags: "#大人の時間 #大人のカフェ #ジャズ喫茶 #jazzbar #大阪 #珈琲時間 #静かな午後 #落ち着き #レコード #bluemoon" }
+  ],
+  coffee: [
+    { text: "珈琲は、一杯で十分だ\nそれ以上は要らない午後\nJazz cafe Blue moon", tags: "#珈琲 #coffee #大阪カフェ #ジャズ喫茶 #specialtycoffee #jazzcafe #珈琲時間 #静かな午後 #大人のカフェ #bluemoon" },
+    { text: "Dark, deep, unhurried\n一杯の珈琲が\n午後を変えてしまう\nJazz cafe Blue moon", tags: "#珈琲 #coffeetime #ジャズ喫茶 #blackcoffee #大阪 #jazzbar #specialtycoffee #大人のカフェ #午後 #静寂" },
+    { text: "香りが先に来て\n苦さが後からやってくる\nJazz cafe Blue moon の珈琲", tags: "#珈琲 #coffee #ジャズ喫茶 #大阪カフェ #coffeelover #jazzcafe #specialtycoffee #午後の珈琲 #静かな時間 #bluemoon" },
+    { text: "今日も珈琲から始める\nジャズが流れる中で\nJazz cafe Blue moon、午後から", tags: "#珈琲 #coffeetime #ジャズ #jazzvinyl #大阪カフェ #coffee #ジャズ喫茶 #jazzbar #珈琲好き #午後" }
+  ],
+  dining: [
+    { text: "音楽の中で食べることは\n少し、特別だ\nJazz cafe Blue moon、今日の午後も", tags: "#ジャズ #jazzbar #大阪グルメ #jazzrestaurant #大阪カフェ #ジャズ喫茶 #ランチ #午後 #音楽のある食事 #bluemoon" },
+    { text: "Eat slowly, listen closely\nジャズと食事は\nどちらも急いではいけない\nJazz cafe Blue moon", tags: "#jazzbar #ジャズ #大阪ランチ #jazzrestaurant #ジャズ喫茶 #音楽のある空間 #大阪グルメ #午後 #大人のカフェ #bluemoon" },
+    { text: "スピーカーが低く鳴る食卓\nそういう場所がある\nJazz cafe Blue moon", tags: "#jazzbar #ジャズ #音楽のある食事 #大阪カフェ #jazzrestaurant #ジャズ喫茶 #大人のカフェ #レコード #午後 #bluemoon" },
+    { text: "食事も、音楽も\n今日の午後のために\nJazz cafe Blue moon", tags: "#ジャズ #jazzbar #大阪グルメ #ランチ #ジャズ喫茶 #jazzrestaurant #音楽のある空間 #大阪カフェ #午後 #bluemoon" }
+  ],
+  kissa: [
+    { text: "こういう場所が\nまだあることを\n誰かに伝えたい\nJazz cafe Blue moon", tags: "#ジャズ喫茶 #jazzkissa #大阪カフェ #レコード #vintageaudio #ヴィンテージオーディオ #jazzbar #昭和レトロ #大人のカフェ #bluemoon" },
+    { text: "レコードの音が\n壁に染みている\nJazz cafe Blue moon", tags: "#ジャズ喫茶 #jazzkissa #レコード #vinyllovers #大阪 #jazzbar #ヴィンテージオーディオ #静寂 #ほの暗い #bluemoon" },
+    { text: "The vinyl turns\n昭和の空気は\nまだここにある\nJazz cafe Blue moon", tags: "#ジャズ喫茶 #jazzkissa #大阪カフェ #レコード #vintage #jazzbar #ヴィンテージオーディオ #大人の空間 #珈琲 #bluemoon" },
+    { text: "喫茶という言葉を\n正しく使える場所が\nここだと思う\nJazz cafe Blue moon", tags: "#ジャズ喫茶 #jazzkissa #大阪 #レコード #vinyllovers #ヴィンテージオーディオ #珈琲 #大人のカフェ #jazzbar #静寂" }
+  ],
+  evening: [
+    { text: "午後の光が\n少しずつ角度を変えていく\nJazz cafe Blue moon にて", tags: "#午後のカフェ #夕暮れ #ジャズ喫茶 #jazzbar #大阪カフェ #珈琲 #sunset #静かな時間 #レコード #bluemoon" },
+    { text: "珈琲の余韻と\n光の傾きが\n重なる時間\nJazz cafe Blue moon", tags: "#夕暮れ #午後 #ジャズ喫茶 #jazzbar #珈琲 #大阪カフェ #goldenhour #静寂 #レコード #bluemoon" },
+    { text: "Afternoon into dusk\n気づけば外が\n暗くなっていた\nJazz cafe Blue moon の窓際で", tags: "#夕暮れ #午後のカフェ #ジャズ喫茶 #大阪カフェ #jazzbar #珈琲時間 #静かな時間 #レコード #dusk #bluemoon" },
+    { text: "今日の終わりを\nここで迎える人がいる\nJazz cafe Blue moon", tags: "#夕暮れ #ジャズ喫茶 #大阪カフェ #jazzbar #午後 #珈琲 #静寂 #レコード #大人のカフェ #bluemoon" }
+  ],
+  rain: [
+    { text: "雨の日は\nジャズが少し優しく聞こえる\nJazz cafe Blue moon、今日も午後から", tags: "#雨の日カフェ #雨 #ジャズ喫茶 #jazzbar #rainyafternoon #珈琲 #大阪カフェ #レコード #静かな午後 #bluemoon" },
+    { text: "Rain on the window\n窓の外を見ながら\n珈琲を飲む理由が増えた\nJazz cafe Blue moon", tags: "#雨の日 #rainyafternoon #ジャズ喫茶 #珈琲 #jazzcafe #大阪カフェ #雨カフェ #静かな時間 #レコード #bluemoon" },
+    { text: "雨音と\nレコードの音と\nどちらを聴いているかわからない午後\nJazz cafe Blue moon", tags: "#雨の日カフェ #ジャズ喫茶 #レコード #rainy #珈琲 #大阪カフェ #jazzbar #静寂 #午後 #bluemoon" },
+    { text: "濡れた街と\nほの暗い店内\nどちらが正解か\nJazz cafe Blue moon", tags: "#雨 #雨の日 #ジャズ喫茶 #大阪カフェ #jazzbar #珈琲時間 #rainyafternoon #静かな空間 #レコード #bluemoon" }
+  ]
+};
+
+function generate() {
+  const list = CAPTIONS[activeMood] || CAPTIONS.record;
+  let idx;
+  do { idx = Math.floor(Math.random() * list.length); } while (list.length > 1 && idx === lastCapIdx);
+  lastCapIdx = idx;
+  const item = list[idx];
+
+  document.getElementById('outText').textContent = item.text;
+  document.getElementById('outTags').textContent = item.tags;
+  document.getElementById('canvasCaption').textContent = item.text;
+
+  // Load photo
+  if (photoSource === 'own' && ownPhotos.length > 0) {
+    const pick = ownPhotos[Math.floor(Math.random() * ownPhotos.length)];
+    setCanvasPhoto(pick);
+  } else {
+    loadUnsplashPhoto(activeMood);
+  }
+}
+
+function showStatus(msg, type) {
+  const s = document.getElementById('statusEl');
+  s.textContent = msg;
+  s.className = 'status ' + (type || '');
+  setTimeout(() => { s.textContent=''; s.className='status'; }, 3000);
+}
+
+function copyAll() {
+  const caption  = document.getElementById('outText').textContent;
+  const hashtags = document.getElementById('outTags').textContent;
+  if (!caption || caption === '—') return;
+  const full = hashtags ? `${caption}\n\n${hashtags}` : caption;
+  navigator.clipboard.writeText(full).then(() => showStatus('コピーしました', 'ok'));
+}
+
+window.addEventListener('load', () => generate());
+</script>
+</body>
+</html>
