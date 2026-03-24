@@ -166,6 +166,37 @@ header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
 .status.ok { color:var(--gold); }
 .status.err { color:#c06050; }
 
+.jacket-drop {
+  border:1px dashed var(--border); border-radius:2px;
+  padding:14px; text-align:center; cursor:pointer;
+  transition:border-color 0.2s; background:var(--surface);
+  position:relative;
+}
+.jacket-drop:hover, .jacket-drop.drag { border-color:var(--gold); }
+.jacket-drop input { display:none; }
+.jacket-preview {
+  width:100%; max-height:120px; object-fit:contain;
+  border-radius:1px; margin-top:8px; display:none;
+}
+.jacket-info {
+  font-family:'Cormorant Garamond',serif;
+  font-size:13px; font-weight:300; line-height:1.75;
+  color:var(--paper); white-space:pre-wrap;
+  background:var(--surface); border:1px solid var(--border);
+  padding:12px; border-radius:1px; margin-top:8px;
+  min-height:60px; display:none;
+}
+.c-jacket-text {
+  position:absolute;
+  color:rgba(237,232,222,0.92);
+  pointer-events:none;
+  text-shadow:0 1px 10px rgba(0,0,0,0.9);
+  transition:opacity 0.3s;
+  white-space:pre-wrap;
+  max-width:85%;
+  line-height:1.55;
+}
+
 @keyframes fadeUp { from{opacity:0;transform:translateY(9px)} to{opacity:1;transform:translateY(0)} }
 @keyframes spin { to{transform:translate(-50%,-50%) rotate(360deg)} }
 </style>
@@ -196,14 +227,17 @@ header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
       <circle cx="105" cy="105" r="2"   fill="#46423c"/>
     </svg>
     <div class="c-logo" id="logoEl" style="display:none;"></div>
+    <div class="c-jacket-text" id="jacketTextEl" style="display:none; top:50%; left:50%; transform:translate(-50%,-50%);"></div>
     <div class="c-content">
       <div class="c-top">
         <div class="c-label">Jazz cafe Blue moon</div>
-        <div class="c-datestr" id="canvasDate"></div>
+        <div style="text-align:right">
+          <div class="c-datestr" id="canvasDate"></div>
+          <div id="openInfoEl" style="font-size:10px; letter-spacing:0.12em; margin-top:3px; opacity:0; transition:opacity 0.3s;"></div>
+        </div>
       </div>
       <div>
         <div class="c-caption" id="canvasCaption">—</div>
-        <div class="c-footer">Jazz cafe Blue moon &middot; open 13:00</div>
       </div>
     </div>
   </div>
@@ -323,6 +357,45 @@ header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
         <span class="tog-label">ロゴ表示</span>
       </div>
 
+      <!-- Open info controls -->
+      <div style="margin-top:10px;">
+        <div class="s-label">営業情報（日付の下に表示）</div>
+        <div class="tog-row" style="margin-bottom:7px;">
+          <div class="tog" id="togOpenInfo" onclick="toggleOpenInfo()"></div>
+          <span class="tog-label">表示する</span>
+        </div>
+        <div id="openInfoOptions" style="display:none;">
+          <div class="ctx-row" style="margin-bottom:6px;">
+            <select class="ctx-sel" id="openStatus" onchange="updateOpenInfo()">
+              <option value="open">open 13:00〜17:30</option>
+              <option value="closed">本日休業日 / Closed today</option>
+              <option value="custom">カスタム入力</option>
+            </select>
+            <select class="ctx-sel" id="openLang" onchange="updateOpenInfo()">
+              <option value="ja">日本語のみ</option>
+              <option value="en">英語のみ</option>
+              <option value="mix">日英ミックス</option>
+            </select>
+          </div>
+          <div id="openCustomArea" style="display:none; margin-bottom:6px;">
+            <input id="openCustomText" type="text" placeholder="カスタムテキスト" style="width:100%; font-family:'Inconsolata',monospace; font-size:11px; background:var(--surface); border:1px solid var(--border); color:var(--paper); padding:7px 9px; border-radius:1px;" oninput="updateOpenInfo()">
+          </div>
+          <div class="ctx-row">
+            <div style="flex:1;">
+              <div class="s-label" style="margin-bottom:4px;">フォントサイズ</div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <input type="range" id="openFontSize" min="8" max="18" value="10" style="flex:1;" oninput="updateOpenInfo()">
+                <span id="openFontSizeVal" style="font-size:10px; color:var(--smoke); min-width:20px;">10</span>
+              </div>
+            </div>
+            <div style="flex:1;">
+              <div class="s-label" style="margin-bottom:4px;">カラー</div>
+              <div style="display:flex; gap:5px; flex-wrap:wrap;" id="openColorPicker"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="logoOptions" style="display:none">
         <div class="s-label" style="margin-top:8px">ロゴ位置</div>
         <div class="pos-grid">
@@ -334,15 +407,81 @@ header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
           <button class="pos-btn" data-pos="br" onclick="setLogoPos('br')">右下</button>
         </div>
 
-        <div class="s-label" style="margin-top:10px">筆記体フォント</div>
+        <div class="s-label" style="margin-top:10px">ロゴフォントサイズ</div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <input type="range" id="logoFontSize" min="16" max="52" value="28" style="flex:1;" oninput="updateLogoEl()">
+          <span id="logoFontSizeVal" style="font-size:10px; color:var(--smoke); min-width:24px;">28</span>
+        </div>
+
+        <div class="s-label">ロゴカラー</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;" id="logoColorPicker"></div>
+
+        <div class="s-label">筆記体フォント</div>
         <div class="font-grid" id="fontGrid"></div>
       </div>
     </div>
 
+    <!-- Hashtag options -->
+    <div>
+      <div class="s-label">ハッシュタグ</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="pos-btn on" data-ht="show" onclick="setHtMode('show')">付ける</button>
+        <button class="pos-btn" data-ht="hide" onclick="setHtMode('hide')">付けない</button>
+        <button class="pos-btn" data-ht="add" onclick="setHtMode('add')">追加する</button>
+      </div>
+      <div id="htAddArea" style="display:none; margin-top:7px;">
+        <input id="htExtra" type="text" placeholder="#追加タグ #スペース区切り" style="width:100%; font-family:'Inconsolata',monospace; font-size:11px; background:var(--surface); border:1px solid var(--border); color:var(--paper); padding:7px 9px; border-radius:1px;">
+      </div>
+    </div>
+
     <!-- Output -->
-    <div class="out-box">
+    <div class="out-box" id="outBox">
       <div class="out-text" id="outText">—</div>
       <div class="out-tags" id="outTags"></div>
+    </div>
+
+    <!-- Jacket recognition -->
+    <div>
+      <div class="s-label">レコードジャケット認識</div>
+      <div class="tog-row" style="margin-bottom:8px;">
+        <div class="tog" id="togJacket" onclick="toggleJacketPanel()"></div>
+        <span class="tog-label">ジャケット情報を表示</span>
+      </div>
+      <div id="jacketPanel" style="display:none;">
+        <div class="jacket-drop" id="jacketDrop" onclick="document.getElementById('jacketInput').click()">
+          <input type="file" id="jacketInput" accept="image/*">
+          <div style="font-size:10px; letter-spacing:0.15em; text-transform:uppercase; color:var(--smoke);">ジャケット写真をタップして選択<br>またはドロップ</div>
+          <img class="jacket-preview" id="jacketPreview">
+        </div>
+        <button class="btn-gen" style="margin-top:8px; width:100%; padding:10px 0;" onclick="recognizeJacket()" id="recognizeBtn">ジャケットを読み取る</button>
+        <div class="jacket-info" id="jacketInfo"></div>
+
+        <div id="jacketTextOptions" style="display:none; margin-top:10px;">
+          <div class="s-label">キャンバス上の位置</div>
+          <div class="pos-grid" style="margin-bottom:8px;">
+            <button class="pos-btn" data-jpos="tl" onclick="setJacketPos('tl')">左上</button>
+            <button class="pos-btn" data-jpos="tc" onclick="setJacketPos('tc')">中央上</button>
+            <button class="pos-btn" data-jpos="tr" onclick="setJacketPos('tr')">右上</button>
+            <button class="pos-btn on" data-jpos="c"  onclick="setJacketPos('c')">中央</button>
+            <button class="pos-btn" data-jpos="bl" onclick="setJacketPos('bl')">左下</button>
+            <button class="pos-btn" data-jpos="bc" onclick="setJacketPos('bc')">中央下</button>
+            <button class="pos-btn" data-jpos="br" onclick="setJacketPos('br')">右下</button>
+          </div>
+          <div class="ctx-row">
+            <div style="flex:1;">
+              <div class="s-label" style="margin-bottom:4px;">フォントサイズ</div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <input type="range" id="jacketFontSize" min="9" max="22" value="12" style="flex:1;" oninput="updateJacketText()">
+                <span id="jacketFontSizeVal" style="font-size:10px; color:var(--smoke); min-width:20px;">12</span>
+              </div>
+            </div>
+            <div style="flex:1;">
+              <div class="s-label" style="margin-bottom:4px;">カラー</div>
+              <div style="display:flex; gap:5px; flex-wrap:wrap;" id="jacketColorPicker"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="btn-row">
@@ -358,6 +497,7 @@ header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
 
 <script>
 const UNSPLASH_KEY = 'BlfKi84Fck9LdUpUg2uG1eyg4uzuumopYcsl7hgbImE';
+const WORKER_URL = 'https://jazzcafe-api.takashiyagishita.workers.dev';
 
 /* ── Date ── */
 const now = new Date();
@@ -675,8 +815,10 @@ function generate() {
   bgPhoto.style.filter = COLOR_FILTER[colorCtx] || '';
 
   document.getElementById('outText').textContent = item.text;
-  document.getElementById('outTags').textContent = item.tags;
-  document.getElementById('canvasCaption').textContent = item.text;
+  const tagsEl = document.getElementById('outTags');
+  tagsEl.dataset.base = item.tags;
+  renderHashtags();
+  document.getElementById('canvasCaption').textContent = showCaption ? item.text : '';
 
   // Load photo
   if (photoSource === 'own' && ownPhotos.length > 0) {
@@ -695,11 +837,13 @@ function showStatus(msg, type) {
 }
 
 function copyAll() {
-  const caption  = document.getElementById('outText').textContent;
-  const hashtags = document.getElementById('outTags').textContent;
-  if (!caption || caption === '—') return;
-  const full = hashtags ? `${caption}\n\n${hashtags}` : caption;
-  navigator.clipboard.writeText(full).then(() => showStatus('コピーしました', 'ok'));
+  const caption  = showCaption ? document.getElementById('outText').textContent : '';
+  const hashtags = htMode !== 'hide' ? document.getElementById('outTags').textContent : '';
+  const base     = document.getElementById('outText').textContent;
+  if (!base || base === '—') return;
+  const parts = [caption, hashtags].filter(Boolean);
+  const full  = htMode === 'hide' ? caption || base : parts.join('\n\n');
+  navigator.clipboard.writeText(full.trim()).then(() => showStatus('コピーしました', 'ok'));
 }
 
 window.addEventListener('load', () => generate());
@@ -742,7 +886,124 @@ function buildFontGrid() {
     const el = document.createElement('div');
     el.className = 'font-thumb' + (f.key === activeFont ? ' on' : '');
     el.innerHTML = `<span style="font-family:'${f.family}',cursive; font-size:18px;">${LOGO_TEXT.split(' ').slice(0,2).join(' ')}</span><small>${f.label}</small>`;
-    el.onclick = () => { activeFont = f.key; updateLogoEl(); buildFontGrid(); };
+    el.onclick = () => { activeFont = f.key; updateLogoEl(); /* ── Color palettes ── */
+const COLORS = [
+  { label:'ゴールド',  val:'rgba(212,176,122,0.90)' },
+  { label:'ホワイト',  val:'rgba(237,232,222,0.90)' },
+  { label:'クリーム',  val:'rgba(255,248,220,0.90)' },
+  { label:'スモーク',  val:'rgba(180,170,155,0.85)' },
+  { label:'シルバー',  val:'rgba(200,200,200,0.88)' },
+  { label:'ローズ',    val:'rgba(210,150,140,0.88)' },
+  { label:'スカイ',    val:'rgba(140,180,220,0.88)' },
+  { label:'ホワイト2', val:'rgba(255,255,255,1.0)'  },
+];
+
+let logoColor    = COLORS[0].val;
+let openColor    = COLORS[0].val;
+let showOpenInfo = false;
+let htMode       = 'show';
+
+function buildColorPicker(containerId, currentVal, onChange) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  COLORS.forEach(c => {
+    const btn = document.createElement('div');
+    btn.title = c.label;
+    btn.style.cssText = `width:20px;height:20px;border-radius:50%;background:${c.val};cursor:pointer;border:2px solid ${currentVal===c.val?'#b8945a':'transparent'};flex-shrink:0;`;
+    btn.onclick = () => { onChange(c.val); buildColorPicker(containerId, c.val, onChange); };
+    el.appendChild(btn);
+  });
+}
+
+buildColorPicker('logoColorPicker', logoColor, v => { logoColor = v; updateLogoEl(); });
+buildColorPicker('openColorPicker', openColor, v => { openColor = v; updateOpenInfo(); });
+
+/* ── Hashtag mode ── */
+function setHtMode(mode) {
+  htMode = mode;
+  document.querySelectorAll('[data-ht]').forEach(b => b.classList.toggle('on', b.dataset.ht === mode));
+  document.getElementById('htAddArea').style.display = mode === 'add' ? 'block' : 'none';
+  renderHashtags();
+}
+
+function renderHashtags() {
+  const baseTags = document.getElementById('outTags').dataset.base || '';
+  const extra    = document.getElementById('htExtra') ? document.getElementById('htExtra').value.trim() : '';
+  const tagsEl   = document.getElementById('outTags');
+  if (htMode === 'hide') { tagsEl.textContent = ''; return; }
+  if (htMode === 'add')  { tagsEl.textContent = baseTags + (extra ? ' ' + extra : ''); return; }
+  tagsEl.textContent = baseTags;
+}
+
+document.getElementById('htExtra') && document.getElementById('htExtra').addEventListener('input', renderHashtags);
+
+/* ── Open info ── */
+const OPEN_TEXTS = {
+  open: {
+    ja:  '本日営業 13:00〜17:30',
+    en:  'open 13:00 – 17:30',
+    mix: 'open 13:00〜17:30',
+  },
+  closed: {
+    ja:  '本日休業日',
+    en:  'Closed today',
+    mix: '本日休業 / Closed today',
+  },
+};
+
+function toggleOpenInfo() {
+  showOpenInfo = !showOpenInfo;
+  document.getElementById('togOpenInfo').classList.toggle('on', showOpenInfo);
+  document.getElementById('openInfoOptions').style.display = showOpenInfo ? 'block' : 'none';
+  updateOpenInfo();
+}
+
+function updateOpenInfo() {
+  const el       = document.getElementById('openInfoEl');
+  const status   = document.getElementById('openStatus').value;
+  const lang     = document.getElementById('openLang').value;
+  const size     = document.getElementById('openFontSize').value;
+  const customTx = document.getElementById('openCustomText') ? document.getElementById('openCustomText').value : '';
+
+  document.getElementById('openFontSizeVal').textContent = size;
+  document.getElementById('openCustomArea').style.display = status === 'custom' ? 'block' : 'none';
+
+  if (!showOpenInfo) { el.style.opacity = '0'; return; }
+
+  let text = '';
+  if (status === 'custom') {
+    text = customTx;
+  } else {
+    text = (OPEN_TEXTS[status] && OPEN_TEXTS[status][lang]) || '';
+  }
+
+  el.textContent  = text;
+  el.style.color  = openColor;
+  el.style.fontSize = size + 'px';
+  el.style.opacity  = '1';
+}
+
+/* ── Override updateLogoEl to use size+color sliders ── */
+const _origUpdateLogoEl = updateLogoEl;
+
+function updateLogoEl() {
+  const el = document.getElementById('logoEl');
+  if (!showLogo) { el.style.display = 'none'; return; }
+  const f    = FONTS.find(x => x.key === activeFont) || FONTS[0];
+  const pos  = POS_STYLE[activePos] || POS_STYLE.tl;
+  const size = document.getElementById('logoFontSize') ? document.getElementById('logoFontSize').value : 28;
+  document.getElementById('logoFontSizeVal') && (document.getElementById('logoFontSizeVal').textContent = size);
+
+  el.style.display    = 'block';
+  el.style.fontFamily = `'${f.family}', cursive`;
+  el.style.fontSize   = size + 'px';
+  el.style.color      = logoColor;
+  el.textContent      = 'Jazz cafe Blue moon';
+  Object.assign(el.style, { top:'auto', left:'auto', right:'auto', bottom:'auto', transform:'none' });
+  Object.assign(el.style, pos);
+}
+
+buildFontGrid(); };
     grid.appendChild(el);
   });
 }
@@ -782,7 +1043,245 @@ function setLogoPos(pos) {
   updateLogoEl();
 }
 
+/* ── Color palettes ── */
+const COLORS = [
+  { label:'ゴールド',  val:'rgba(212,176,122,0.90)' },
+  { label:'ホワイト',  val:'rgba(237,232,222,0.90)' },
+  { label:'クリーム',  val:'rgba(255,248,220,0.90)' },
+  { label:'スモーク',  val:'rgba(180,170,155,0.85)' },
+  { label:'シルバー',  val:'rgba(200,200,200,0.88)' },
+  { label:'ローズ',    val:'rgba(210,150,140,0.88)' },
+  { label:'スカイ',    val:'rgba(140,180,220,0.88)' },
+  { label:'ホワイト2', val:'rgba(255,255,255,1.0)'  },
+];
+
+let logoColor    = COLORS[0].val;
+let openColor    = COLORS[0].val;
+let showOpenInfo = false;
+let htMode       = 'show';
+
+function buildColorPicker(containerId, currentVal, onChange) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  COLORS.forEach(c => {
+    const btn = document.createElement('div');
+    btn.title = c.label;
+    btn.style.cssText = `width:20px;height:20px;border-radius:50%;background:${c.val};cursor:pointer;border:2px solid ${currentVal===c.val?'#b8945a':'transparent'};flex-shrink:0;`;
+    btn.onclick = () => { onChange(c.val); buildColorPicker(containerId, c.val, onChange); };
+    el.appendChild(btn);
+  });
+}
+
+buildColorPicker('logoColorPicker', logoColor, v => { logoColor = v; updateLogoEl(); });
+buildColorPicker('openColorPicker', openColor, v => { openColor = v; updateOpenInfo(); });
+
+/* ── Hashtag mode ── */
+function setHtMode(mode) {
+  htMode = mode;
+  document.querySelectorAll('[data-ht]').forEach(b => b.classList.toggle('on', b.dataset.ht === mode));
+  document.getElementById('htAddArea').style.display = mode === 'add' ? 'block' : 'none';
+  renderHashtags();
+}
+
+function renderHashtags() {
+  const baseTags = document.getElementById('outTags').dataset.base || '';
+  const extra    = document.getElementById('htExtra') ? document.getElementById('htExtra').value.trim() : '';
+  const tagsEl   = document.getElementById('outTags');
+  if (htMode === 'hide') { tagsEl.textContent = ''; return; }
+  if (htMode === 'add')  { tagsEl.textContent = baseTags + (extra ? ' ' + extra : ''); return; }
+  tagsEl.textContent = baseTags;
+}
+
+document.getElementById('htExtra') && document.getElementById('htExtra').addEventListener('input', renderHashtags);
+
+/* ── Open info ── */
+const OPEN_TEXTS = {
+  open: {
+    ja:  '本日営業 13:00〜17:30',
+    en:  'open 13:00 – 17:30',
+    mix: 'open 13:00〜17:30',
+  },
+  closed: {
+    ja:  '本日休業日',
+    en:  'Closed today',
+    mix: '本日休業 / Closed today',
+  },
+};
+
+function toggleOpenInfo() {
+  showOpenInfo = !showOpenInfo;
+  document.getElementById('togOpenInfo').classList.toggle('on', showOpenInfo);
+  document.getElementById('openInfoOptions').style.display = showOpenInfo ? 'block' : 'none';
+  updateOpenInfo();
+}
+
+function updateOpenInfo() {
+  const el       = document.getElementById('openInfoEl');
+  const status   = document.getElementById('openStatus').value;
+  const lang     = document.getElementById('openLang').value;
+  const size     = document.getElementById('openFontSize').value;
+  const customTx = document.getElementById('openCustomText') ? document.getElementById('openCustomText').value : '';
+
+  document.getElementById('openFontSizeVal').textContent = size;
+  document.getElementById('openCustomArea').style.display = status === 'custom' ? 'block' : 'none';
+
+  if (!showOpenInfo) { el.style.opacity = '0'; return; }
+
+  let text = '';
+  if (status === 'custom') {
+    text = customTx;
+  } else {
+    text = (OPEN_TEXTS[status] && OPEN_TEXTS[status][lang]) || '';
+  }
+
+  el.textContent  = text;
+  el.style.color  = openColor;
+  el.style.fontSize = size + 'px';
+  el.style.opacity  = '1';
+}
+
+/* ── Override updateLogoEl to use size+color sliders ── */
+const _origUpdateLogoEl = updateLogoEl;
+
+function updateLogoEl() {
+  const el = document.getElementById('logoEl');
+  if (!showLogo) { el.style.display = 'none'; return; }
+  const f    = FONTS.find(x => x.key === activeFont) || FONTS[0];
+  const pos  = POS_STYLE[activePos] || POS_STYLE.tl;
+  const size = document.getElementById('logoFontSize') ? document.getElementById('logoFontSize').value : 28;
+  document.getElementById('logoFontSizeVal') && (document.getElementById('logoFontSizeVal').textContent = size);
+
+  el.style.display    = 'block';
+  el.style.fontFamily = `'${f.family}', cursive`;
+  el.style.fontSize   = size + 'px';
+  el.style.color      = logoColor;
+  el.textContent      = 'Jazz cafe Blue moon';
+  Object.assign(el.style, { top:'auto', left:'auto', right:'auto', bottom:'auto', transform:'none' });
+  Object.assign(el.style, pos);
+}
+
 buildFontGrid();
+
+/* ── Jacket Recognition ── */
+let jacketBase64   = null;
+let jacketColor    = 'rgba(237,232,222,0.92)';
+let jacketPos      = 'c';
+let showJacket     = false;
+let jacketInfoText = '';
+
+const JACKET_POS_STYLE = {
+  tl: { top:'22px',   left:'22px',  right:'auto',  bottom:'auto',  transform:'none' },
+  tc: { top:'22px',   left:'50%',   right:'auto',  bottom:'auto',  transform:'translateX(-50%)' },
+  tr: { top:'22px',   right:'22px', left:'auto',   bottom:'auto',  transform:'none' },
+  c:  { top:'50%',    left:'50%',   right:'auto',  bottom:'auto',  transform:'translate(-50%,-50%)' },
+  bl: { bottom:'22px',left:'22px',  right:'auto',  top:'auto',     transform:'none' },
+  bc: { bottom:'22px',left:'50%',   right:'auto',  top:'auto',     transform:'translateX(-50%)' },
+  br: { bottom:'22px',right:'22px', left:'auto',   top:'auto',     transform:'none' },
+};
+
+buildColorPicker('jacketColorPicker', jacketColor, v => { jacketColor = v; updateJacketText(); });
+
+function toggleJacketPanel() {
+  showJacket = !showJacket;
+  document.getElementById('togJacket').classList.toggle('on', showJacket);
+  document.getElementById('jacketPanel').style.display = showJacket ? 'block' : 'none';
+  updateJacketText();
+}
+
+const jacketDrop  = document.getElementById('jacketDrop');
+const jacketInput = document.getElementById('jacketInput');
+
+jacketDrop.addEventListener('dragover', e => { e.preventDefault(); jacketDrop.classList.add('drag'); });
+jacketDrop.addEventListener('dragleave', () => jacketDrop.classList.remove('drag'));
+jacketDrop.addEventListener('drop', e => { e.preventDefault(); jacketDrop.classList.remove('drag'); loadJacketFile(e.dataTransfer.files[0]); });
+jacketInput.addEventListener('change', () => loadJacketFile(jacketInput.files[0]));
+
+function loadJacketFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    jacketBase64  = dataUrl.split(',')[1];
+    const prev    = document.getElementById('jacketPreview');
+    prev.src      = dataUrl;
+    prev.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function recognizeJacket() {
+  if (!jacketBase64) { showStatus('先にジャケット写真を選んでください', 'err'); return; }
+  const btn = document.getElementById('recognizeBtn');
+  const infoEl = document.getElementById('jacketInfo');
+  btn.disabled = true;
+  btn.textContent = '読み取り中...';
+  infoEl.style.display = 'block';
+  infoEl.textContent = '解析中です。少しお待ちください...';
+
+  const prompt = `このレコードジャケット画像を見て、以下をコンパクトにまとめてください：
+
+1. アルバム名・アーティスト名
+2. 参加ミュージシャン（わかる範囲で）
+3. 録音年・レーベル
+4. 演奏の特徴・聴きどころ（2〜3文）
+5. このアルバムの評価・位置づけ（1〜2文）
+
+日本語で、カフェのInstagram投稿に添える紹介文として自然な文体で。全体150字以内でコンパクトに。`;
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: jacketBase64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || 'API error');
+    const text = data.content.map(b => b.text || '').join('');
+    jacketInfoText = text;
+    infoEl.textContent = text;
+    document.getElementById('jacketTextOptions').style.display = 'block';
+    updateJacketText();
+    showStatus('読み取り完了', 'ok');
+  } catch(e) {
+    infoEl.textContent = 'エラー: ' + e.message;
+    showStatus('読み取りに失敗しました', 'err');
+  }
+  btn.disabled = false;
+  btn.textContent = 'ジャケットを読み取る';
+}
+
+function setJacketPos(pos) {
+  jacketPos = pos;
+  document.querySelectorAll('[data-jpos]').forEach(b => b.classList.toggle('on', b.dataset.jpos === pos));
+  updateJacketText();
+}
+
+function updateJacketText() {
+  const el   = document.getElementById('jacketTextEl');
+  const size = document.getElementById('jacketFontSize') ? document.getElementById('jacketFontSize').value : 12;
+  document.getElementById('jacketFontSizeVal') && (document.getElementById('jacketFontSizeVal').textContent = size);
+
+  if (!showJacket || !jacketInfoText) { el.style.display = 'none'; return; }
+
+  const pos = JACKET_POS_STYLE[jacketPos] || JACKET_POS_STYLE.c;
+  el.style.display    = 'block';
+  el.style.fontSize   = size + 'px';
+  el.style.color      = jacketColor;
+  el.textContent      = jacketInfoText;
+  Object.assign(el.style, { top:'auto', left:'auto', right:'auto', bottom:'auto', transform:'none' });
+  Object.assign(el.style, pos);
+}
 
 async function saveImage() {
   const btn = document.querySelector('.btn-save');
