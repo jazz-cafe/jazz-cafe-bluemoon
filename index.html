@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Jazz cafe Blue moon — Post Generator</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inconsolata:wght@300;400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Inconsolata:wght@300;400&family=Pinyon+Script&family=Herr+Von+Muellerhoff&family=Monsieur+La+Doulaise&family=Italianno&family=Lovers+Quarrel&family=Euphoria+Script&family=Stalemate&family=Clicker+Script&display=swap');
 
 :root {
   --ink: #141210;
@@ -45,6 +45,51 @@ header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
 .c-datestr { font-family:'Cormorant Garamond',serif; font-size:11px; font-style:italic; letter-spacing:0.1em; color:rgba(237,232,222,0.4); }
 .c-caption { font-family:'Cormorant Garamond',serif; font-size:clamp(11px,1.6vw,14px); font-weight:300; line-height:1.82; color:var(--paper); white-space:pre-wrap; text-shadow:0 1px 14px rgba(0,0,0,0.95); min-height:3em; }
 .c-footer { font-size:8px; letter-spacing:0.24em; color:var(--gold); text-transform:uppercase; opacity:0.55; margin-top:12px; }
+
+.c-logo {
+  position:absolute;
+  color:rgba(212,176,122,0.88);
+  line-height:1.1;
+  pointer-events:none;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+
+.font-grid { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.font-thumb {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:1px; padding:6px 10px; cursor:pointer;
+  transition:all 0.15s; flex: 0 0 auto;
+}
+.font-thumb:hover { border-color:var(--smoke); }
+.font-thumb.on { border-color:var(--gold); background:rgba(184,148,90,0.11); }
+.font-thumb span { color:var(--gold); font-size:18px; line-height:1; display:block; }
+.font-thumb small { color:var(--smoke); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; display:block; margin-top:2px; }
+
+.tog-row { display:flex; align-items:center; gap:10px; }
+.tog-label { font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--smoke); }
+.tog {
+  position:relative; width:34px; height:18px;
+  background:var(--border); border-radius:9px;
+  cursor:pointer; transition:background 0.2s; flex-shrink:0;
+}
+.tog.on { background:var(--gold); }
+.tog::after {
+  content:''; position:absolute; top:2px; left:2px;
+  width:14px; height:14px; border-radius:50%;
+  background:#fff; transition:transform 0.2s;
+}
+.tog.on::after { transform:translateX(16px); }
+
+.pos-grid { display:flex; gap:5px; flex-wrap:wrap; margin-top:6px; }
+.pos-btn {
+  font-family:'Inconsolata',monospace; font-size:10px; letter-spacing:0.08em;
+  padding:4px 9px; border:1px solid var(--border); background:transparent;
+  color:var(--smoke); cursor:pointer; transition:all 0.15s; border-radius:1px;
+}
+.pos-btn:hover { border-color:var(--smoke); color:var(--paper); }
+.pos-btn.on { background:rgba(184,148,90,0.11); border-color:var(--gold); color:var(--gold); }
 
 /* Drop zone */
 .drop-zone {
@@ -150,6 +195,7 @@ header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
       <circle cx="105" cy="105" r="5.5" fill="#2c2820"/>
       <circle cx="105" cy="105" r="2"   fill="#46423c"/>
     </svg>
+    <div class="c-logo" id="logoEl" style="display:none;"></div>
     <div class="c-content">
       <div class="c-top">
         <div class="c-label">Jazz cafe Blue moon</div>
@@ -263,6 +309,33 @@ header { text-align:center; margin-bottom:32px; animation:fadeUp 1s ease both; }
           <input type="file" id="fileInput" accept="image/*" multiple>
         </div>
         <div class="photo-thumbs" id="photoThumbs"></div>
+      </div>
+    </div>
+
+    <!-- Logo options -->
+    <div>
+      <div class="s-label">ロゴ・キャプション設定</div>
+
+      <div class="tog-row" style="margin-bottom:8px">
+        <div class="tog on" id="togCaption" onclick="toggleCaption()"></div>
+        <span class="tog-label">キャプション表示</span>
+        <div class="tog" id="togLogo" onclick="toggleLogo()" style="margin-left:16px"></div>
+        <span class="tog-label">ロゴ表示</span>
+      </div>
+
+      <div id="logoOptions" style="display:none">
+        <div class="s-label" style="margin-top:8px">ロゴ位置</div>
+        <div class="pos-grid">
+          <button class="pos-btn on" data-pos="tl" onclick="setLogoPos('tl')">左上</button>
+          <button class="pos-btn" data-pos="tc" onclick="setLogoPos('tc')">中央上</button>
+          <button class="pos-btn" data-pos="tr" onclick="setLogoPos('tr')">右上</button>
+          <button class="pos-btn" data-pos="bl" onclick="setLogoPos('bl')">左下</button>
+          <button class="pos-btn" data-pos="bc" onclick="setLogoPos('bc')">中央下</button>
+          <button class="pos-btn" data-pos="br" onclick="setLogoPos('br')">右下</button>
+        </div>
+
+        <div class="s-label" style="margin-top:10px">筆記体フォント</div>
+        <div class="font-grid" id="fontGrid"></div>
       </div>
     </div>
 
@@ -633,6 +706,84 @@ window.addEventListener('load', () => generate());
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
+/* ── Logo & Font System ── */
+const FONTS = [
+  { key:'pinyon',   family:'Pinyon Script',          label:'Pinyon'   },
+  { key:'herr',     family:'Herr Von Muellerhoff',   label:'Herr Von' },
+  { key:'monsieur', family:'Monsieur La Doulaise',   label:'Monsieur' },
+  { key:'italiano', family:'Italianno',              label:'Italianno'},
+  { key:'lovers',   family:'Lovers Quarrel',         label:'Lovers'   },
+  { key:'euphoria', family:'Euphoria Script',        label:'Euphoria' },
+  { key:'stalemate',family:'Stalemate',              label:'Stalemate'},
+  { key:'clicker',  family:'Clicker Script',         label:'Clicker'  },
+];
+
+let activeFont    = 'pinyon';
+let activePos     = 'tl';
+let showLogo      = false;
+let showCaption   = true;
+
+const LOGO_TEXT   = 'Jazz cafe Blue moon';
+const FONT_SIZES  = { pinyon:28, herr:30, monsieur:28, italiano:28, lovers:28, euphoria:26, stalemate:26, clicker:26 };
+
+const POS_STYLE = {
+  tl: { top:'22px',  left:'22px',  right:'auto',  bottom:'auto',  textAlign:'left'   },
+  tc: { top:'22px',  left:'50%',   right:'auto',  bottom:'auto',  textAlign:'center', transform:'translateX(-50%)' },
+  tr: { top:'22px',  right:'22px', left:'auto',   bottom:'auto',  textAlign:'right'  },
+  bl: { bottom:'44px', left:'22px', right:'auto', top:'auto',     textAlign:'left'   },
+  bc: { bottom:'44px', left:'50%', right:'auto',  top:'auto',     textAlign:'center', transform:'translateX(-50%)' },
+  br: { bottom:'44px', right:'22px', left:'auto', top:'auto',     textAlign:'right'  },
+};
+
+function buildFontGrid() {
+  const grid = document.getElementById('fontGrid');
+  grid.innerHTML = '';
+  FONTS.forEach(f => {
+    const el = document.createElement('div');
+    el.className = 'font-thumb' + (f.key === activeFont ? ' on' : '');
+    el.innerHTML = `<span style="font-family:'${f.family}',cursive; font-size:18px;">${LOGO_TEXT.split(' ').slice(0,2).join(' ')}</span><small>${f.label}</small>`;
+    el.onclick = () => { activeFont = f.key; updateLogoEl(); buildFontGrid(); };
+    grid.appendChild(el);
+  });
+}
+
+function updateLogoEl() {
+  const el = document.getElementById('logoEl');
+  if (!showLogo) { el.style.display = 'none'; return; }
+  const f = FONTS.find(x => x.key === activeFont) || FONTS[0];
+  const pos = POS_STYLE[activePos] || POS_STYLE.tl;
+  el.style.display = 'block';
+  el.style.fontFamily = `'${f.family}', cursive`;
+  el.style.fontSize   = (FONT_SIZES[activeFont] || 26) + 'px';
+  el.textContent      = LOGO_TEXT;
+  Object.assign(el.style, { top:'auto', left:'auto', right:'auto', bottom:'auto', transform:'none' });
+  Object.assign(el.style, pos);
+}
+
+function toggleLogo() {
+  showLogo = !showLogo;
+  document.getElementById('togLogo').classList.toggle('on', showLogo);
+  document.getElementById('logoOptions').style.display = showLogo ? 'block' : 'none';
+  updateLogoEl();
+}
+
+function toggleCaption() {
+  showCaption = !showCaption;
+  document.getElementById('togCaption').classList.toggle('on', showCaption);
+  const outBox = document.getElementById('outBox');
+  if (outBox) outBox.style.opacity = showCaption ? '1' : '0.3';
+  document.getElementById('canvasCaption').style.opacity = showCaption ? '1' : '0';
+  document.getElementById('canvasCaption').parentElement.style.opacity = showCaption ? '1' : '0';
+}
+
+function setLogoPos(pos) {
+  activePos = pos;
+  document.querySelectorAll('.pos-btn').forEach(b => b.classList.toggle('on', b.dataset.pos === pos));
+  updateLogoEl();
+}
+
+buildFontGrid();
+
 async function saveImage() {
   const btn = document.querySelector('.btn-save');
   const status = document.getElementById('statusEl');
